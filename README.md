@@ -1,2 +1,5 @@
-# data_drift
-Repository for storing Data Drift work for dissertations.
+# Resumo
+Modelos de Machine Learning e processos de negócio dependem da estabilidade e da qualidade dos dados utilizados como entrada. Ao longo do tempo, entretanto, as características estatísticas e as distribuições desses dados podem sofrer alterações, fenômeno conhecido como Data Drift. Embora a ocorrência de drift não implique necessariamente degradação do desempenho de um modelo, sua identificação é importante para permitir o monitoramento e a investigação de possíveis impactos nos resultados produzidos. Neste trabalho, é apresentada uma arquitetura para diagnóstico de Data Drift voltada a ambientes de Big Data, contemplando o monitoramento de variáveis numéricas e categóricas. A proposta aborda a construção de perfis de referência e de produção, a aplicação de diferentes métricas estatísticas para identificação de alterações nas distribuições e a classificação da severidade do drift por variável e para o conjunto de dados. Como parte da solução, são desenvolvidos componentes em PySpark para realizar o perfilamento, o cálculo das métricas e a geração de relatórios de diagnóstico. Dessa forma, busca-se apresentar uma abordagem distribuída e aplicável a grandes volumes de dados, contribuindo para a identificação de mudanças nos padrões dos dados e para o monitoramento contínuo de modelos de Machine Learning.
+
+# Introdução
+
