@@ -1,5 +1,14 @@
+# Arquitetura para detecção automática de Data Drift para BigData
+
 # Resumo
 Modelos de Machine Learning e processos de negócio dependem da estabilidade e da qualidade dos dados utilizados como entrada. Ao longo do tempo, entretanto, as características estatísticas e as distribuições desses dados podem sofrer alterações, fenômeno conhecido como Data Drift. Embora a ocorrência de drift não implique necessariamente degradação do desempenho de um modelo, sua identificação é importante para permitir o monitoramento e a investigação de possíveis impactos nos resultados produzidos. Neste trabalho, é apresentada uma arquitetura para diagnóstico de Data Drift voltada a ambientes de Big Data, contemplando o monitoramento de variáveis numéricas e categóricas. A proposta aborda a construção de perfis de referência e de produção, a aplicação de diferentes métricas estatísticas para identificação de alterações nas distribuições e a classificação da severidade do drift por variável e para o conjunto de dados. Como parte da solução, são desenvolvidos componentes em PySpark para realizar o perfilamento, o cálculo das métricas e a geração de relatórios de diagnóstico. Dessa forma, busca-se apresentar uma abordagem distribuída e aplicável a grandes volumes de dados, contribuindo para a identificação de mudanças nos padrões dos dados e para o monitoramento contínuo de modelos de Machine Learning.
+
+# Abstract
+Title: Architecture for automatic data drift detection in Big Data.
+
+Machine Learning models and business processes depend on the stability and quality of the input data used. Over time, however, the statistical characteristics and distributions of these data can undergo changes, a phenomenon known as Data Drift. Although the occurrence of drift does not necessarily imply performance degradation of a model, its identification is important to enable monitoring and investigation of potential impacts on the generated results. In this work, an architecture for Data Drift diagnosis targeted at Big Data environments is presented, covering the monitoring of numerical and categorical variables. The proposal addresses the construction of reference and production profiles, the application of different statistical metrics to identify distribution changes, and the classification of drift severity per variable and for the dataset as a whole. As part of the solution, components are developed in PySpark to perform profiling, metric calculation, and the generation of diagnostic reports. Thus, the objective is to present a distributed approach applicable to large data volumes, contributing to the identification of changes in data patterns and the continuous monitoring of Machine Learning models.
+
+Keywords: Data Drift, Machine Learning, Big Data, PySpark, Data Monitoring
 
 # Introdução
 
@@ -13,5 +22,30 @@ Tem que deixar claro também que tem dois tipos de drifts importantes. No que ir
 
 Dentro dos estudos apresentados, oferecem diversas formas de identificar o drift. No caso de Ackerman et al. (2022), ele cria método com a diminuição de componentes para analisar o drift e impacto no modelo. No nosso estudo, iremos focar apenas no primeiro conceito apresentado antes, mudança de P(X) que impacta o modelo de machine learning, porém, o foco será construir uma arquitetura para o ambiente BigData visto que no ano de 2026 o número de dados movidos no mundo deve chegar a (Fonte). Devido a isso, iremos construir essa infraestrutura dentro do ambiente do Pyspark. 
 
-Para testar a arquitetura, será utilizado dados do Kaggle
- Além disso, é importante enfatizar que é válido ter essa detecção de Drift quando o modelo de Machine Learning perde sua performance de acordo com suas métricas de desempenho.
+# Data Drift
+
+Neste tópico vamos explicar de forma resumida um pouco dos tipos de data drift e se esses tipos de drift impactam um modelo de ML. Como visto no tópico anterior, temos diferentes tipos de drifts e vamos explorar cada um deles. 
+
+O primeiro Drift e o qual iremos trabalhar dentro do artigo é o Data/Covariate, quando olhamos apenas para a distribuição de uma unica variavel, ou seja, em forma matemática é quando seu P(X_treino) difere estatistcamente do P(X_prod). Para mostrar isso de forma mais lúcida, vamos trazer o exemplo de Gama et al. (2014), ele traz um exemplo de um modelo de credit scoring que é treinado com dados históricos em que a variável "renda mensal" segue uma distribuição relativamente estável, centrada em uma faixa específica. Após um evento macroeconômico (por exemplo, um período de inflação alta ou uma crise que reduz o poder de compra), a distribuição dessa única variável se desloca: a média cai, a variância aumenta, ou a forma da distribuição muda (passa a ter mais assimetria). Isso caracteriza um drift univariado de covariável: a distribuição de entrada P(renda) mudou, mesmo que a relação entre renda e risco de inadimplência (P(Y|X)) permaneça a mesma. Como o modelo foi treinado sob a distribuição antiga, seu desempenho degrada porque passa a operar numa região do espaço de entrada pouco representada nos dados de treino. Esse tipo de exemplo (mudança em P(X) sem necessariamente mudar a relação com o alvo) está alinhado à distinção clássica entre drift real (mudança em P(Y|X)) e drift virtual/covariate shift (mudança apenas em P(X)) discutida na literatura de concept drift. 
+
+A figura abaixo ilustra um pouco sobre o assunto que estamos falando. Para esses casos, a melhor forma para verificar se uma distribuição muda de uma para outra é a função de probabilidade acumulada, diferentemente, do Histograma.
+
+Outro ponto é o Concept Drift que foi colocado já no tópico anterior.  
+
+
+(Gama et al., 2014)
+
+GAMA, J. et al. A survey on concept drift adaptation. ACM Computing Surveys, v. 46, n. 4, p. 1-37, 2014.
+
+Gama, J., Žliobaitė, I., Bifet, A., Pechenizkiy, M., & Bouchachia, A. (2014). A change in user's interests when following an online news stream is described as concept drift, and the survey distinguishes cases where the conditional distribution of the target given the input changes from cases where the input distribution itself may shift while that relationship stays the same. ACM Computing Surveys, 46(4), Artigo 44, 1–37.
+
+
+
+
+# Info sobre a Dissertação
+
+Nome Orientador:
+Carlos Henrique Rodrigues Sarro
+
+Email Orientador: 
+chsarro@gmail.com
