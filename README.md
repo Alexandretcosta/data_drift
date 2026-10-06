@@ -24,23 +24,49 @@ Dentro dos estudos apresentados, oferecem diversas formas de identificar o drift
 
 # Data Drift
 
-Neste tópico vamos explicar de forma resumida um pouco dos tipos de data drift e se esses tipos de drift impactam um modelo de ML. Como visto no tópico anterior, temos diferentes tipos de drifts e vamos explorar cada um deles. 
+Neste tópico, apresentamos de forma resumida os principais tipos de data drift e discutimos se cada um deles impacta o desempenho de um modelo de Machine Learning. Como visto no tópico anterior, existem diferentes tipos de drift, e vamos explorar cada um deles a seguir.
 
-O primeiro Drift e o qual iremos trabalhar dentro do artigo é o Data/Covariate, quando olhamos apenas para a distribuição de uma unica variavel, ou seja, em forma matemática é quando seu P(X_treino) difere estatistcamente do P(X_prod). Para mostrar isso de forma mais lúcida, vamos trazer o exemplo de Gama et al. (2014), ele traz um exemplo de um modelo de credit scoring que é treinado com dados históricos em que a variável "renda mensal" segue uma distribuição relativamente estável, centrada em uma faixa específica. Após um evento macroeconômico (por exemplo, um período de inflação alta ou uma crise que reduz o poder de compra), a distribuição dessa única variável se desloca: a média cai, a variância aumenta, ou a forma da distribuição muda (passa a ter mais assimetria). Isso caracteriza um drift univariado de covariável: a distribuição de entrada P(renda) mudou, mesmo que a relação entre renda e risco de inadimplência (P(Y|X)) permaneça a mesma. Como o modelo foi treinado sob a distribuição antiga, seu desempenho degrada porque passa a operar numa região do espaço de entrada pouco representada nos dados de treino. Esse tipo de exemplo (mudança em P(X) sem necessariamente mudar a relação com o alvo) está alinhado à distinção clássica entre drift real (mudança em P(Y|X)) e drift virtual/covariate shift (mudança apenas em P(X)) discutida na literatura de concept drift. 
+O primeiro tipo, e o que será trabalhado ao longo deste artigo, é o Data Drift, também chamado de Covariate Drift. Ele ocorre quando a distribuição de uma variável de entrada se altera, ou seja, matematicamente, quando P(X_treino) difere estatisticamente de P(X_prod). Para ilustrar, tomamos como base o exemplo de Gama et al. (2014): um modelo de credit scoring treinado com dados históricos nos quais a variável "renda mensal" apresenta uma distribuição relativamente estável, centrada em uma faixa específica. Após um evento macroeconômico, como um período de inflação alta ou uma crise que reduz o poder de compra, a distribuição dessa variável se desloca: a média diminui, a variância aumenta ou a forma da distribuição muda, passando a apresentar maior assimetria.
 
-A figura abaixo ilustra um pouco sobre o assunto que estamos falando. Para esses casos, a melhor forma para verificar se uma distribuição muda de uma para outra é a função de probabilidade acumulada, diferentemente, do Histograma.
+Isso caracteriza um drift univariado de covariável: a distribuição de entrada P(renda) mudou, ainda que a relação entre renda e risco de inadimplência, P(Y|X), permaneça a mesma. Como o modelo foi treinado sob a distribuição antiga, seu desempenho se degrada, pois ele passa a operar em uma região do espaço de entrada pouco representada nos dados de treino. Esse cenário, em que há mudança em P(X) sem alteração na relação com o alvo, corresponde à distinção clássica, discutida na literatura de concept drift, entre drift real (mudança em P(Y|X)) e drift virtual, ou covariate shift (mudança apenas em P(X)).
 
-Outro ponto é o Concept Drift que foi colocado já no tópico anterior.  
+A figura abaixo ilustra o conceito. Para verificar se a distribuição de uma variável mudou entre treino e produção, uma abordagem mais robusta é comparar as funções de distribuição acumulada (CDF), como ocorre no teste de Kolmogorov-Smirnov, em vez de depender apenas do histograma, cujo aspecto varia conforme a escolha dos intervalos (bins).
 
+O Label Drift (ou Target Drift) ocorre quando a distribuição da variável alvo muda ao longo do tempo, ou seja, quando P(Y_treino)  P(Y_prod), mesmo que a relação P(X|Y) permaneça estável. Um exemplo clássico está na detecção de fraude: se o modelo foi treinado em um período em que 1% das transações eram fraudulentas e, em produção, essa proporção sobe para 5% por conta de uma nova campanha de ataques, a distribuição do rótulo se alterou. O mesmo vale para um modelo de churn durante uma crise econômica, em que a taxa de cancelamento aumenta de forma generalizada. Uma particularidade importante é que, em produção, os rótulos reais costumam chegar com atraso (como a confirmação de uma fraude ou de uma inadimplência), o que torna a detecção do Label Drift mais lenta e, muitas vezes, dependente de proxies, como a distribuição das próprias predições do modelo.
 
-(Gama et al., 2014)
+Em relação ao impacto, o Label Drift tende a afetar o modelo, mas de forma diferente do Covariate Drift. Como o modelo aprendeu implicitamente a probabilidade a priori das classes, uma mudança nessa proporção desloca o ponto de operação ideal: as probabilidades preditas ficam descalibradas e o limiar de decisão deixa de ser adequado, prejudicando métricas como precisão, recall e acurácia, especialmente em problemas desbalanceados. Já métricas independentes da prevalência, como a curva ROC e a AUC, podem permanecer relativamente estáveis, o que significa que o impacto nem sempre é uma perda de poder discriminativo, mas sim de calibração e de decisão. Quando a mudança é pequena e o modelo é robusto, o efeito pode ser desprezível; quando é significativa, geralmente se corrige com recalibração, ajuste de limiares ou retreinamento.
 
-GAMA, J. et al. A survey on concept drift adaptation. ACM Computing Surveys, v. 46, n. 4, p. 1-37, 2014.
+No próximo tópico, abordaremos as métricas de detecção de drift e definiremos quais serão utilizadas no desenvolvimento do algoritmo.
 
-Gama, J., Žliobaitė, I., Bifet, A., Pechenizkiy, M., & Bouchachia, A. (2014). A change in user's interests when following an online news stream is described as concept drift, and the survey distinguishes cases where the conditional distribution of the target given the input changes from cases where the input distribution itself may shift while that relationship stays the same. ACM Computing Surveys, 46(4), Artigo 44, 1–37.
+# Métricas para detecção de Drift
 
+A detecção de drift pode ser feita com dezenas de métodos estatísticos, mas implementar todos eles não contribuiria para os objetivos deste trabalho. Por isso, foi selecionado um conjunto reduzido de métricas que cobre diferentes famílias de comparação entre distribuições: o Population Stability Index (PSI), o teste de Kolmogorov-Smirnov (KS), a divergência de Jensen-Shannon (JS), o teste Qui-quadrado (χ²) para variáveis categóricas e a distância de Hellinger. Todas comparam a distribuição de uma janela de referência (dados de treino) com a de uma janela atual (dados de produção), mas diferem na interpretação do resultado, nas premissas e, principalmente, no custo de cálculo.
 
+O PSI quantifica o deslocamento entre duas distribuições a partir da proporção de observações em cada intervalo (bin), sendo amplamente usado em risco de crédito pela facilidade de interpretação e pelos limiares empíricos consagrados. Sua limitação é a dependência da escolha dos bins. O KS é um teste não paramétrico que mede a maior diferença entre as funções de distribuição acumulada de duas amostras, sem assumir uma forma específica para os dados, mas é essencialmente univariado. A divergência de Jensen-Shannon é uma versão simétrica e limitada da divergência de Kullback-Leibler, o que facilita a interpretação, embora exija discretização ou estimação das densidades. O Qui-quadrado compara as frequências observadas e esperadas das categorias de uma variável categórica, sendo a escolha natural para esse tipo de dado. A distância de Hellinger mede a similaridade entre distribuições de probabilidade e também depende de uma representação discretizada, com custo que tende a crescer quando se consideram várias dimensões ao mesmo tempo.
 
+| Métrica | Tipo de dado | Natureza | Vantagem | Limitação | Interpretação |
+|---|---|---|---|---|---|
+| **PSI** | Numérico ou categórico | Distância/índice | Simples, interpretável e amplamente utilizado em monitoramento | Sensível à definição dos *bins* | Valores maiores indicam maior diferença entre as distribuições |
+| **Kolmogorov-Smirnov (KS)** | Numérico contínuo | Teste estatístico | Não paramétrico e não requer discretização | Aplicação tradicionalmente univariada; sensível ao tamanho amostral | Baseia-se na maior diferença absoluta entre as funções de distribuição acumulada |
+| **Jensen-Shannon (JS)** | Numérico ou categórico | Divergência | Simétrica, limitada e mais estável que KL em algumas situações | Requer estimativa das distribuições | Quanto maior a divergência, maior a diferença entre as distribuições |
+| **Qui-quadrado (χ²)** | Categórico | Teste estatístico | Adequado para comparar frequências observadas e esperadas | Requer condições sobre frequências esperadas e pode ser sensível a grandes amostras | *p*-valor baixo sugere evidência de diferença entre as distribuições |
+| **Distância de Hellinger** | Numérico ou categórico | Distância | Simétrica, limitada e independente de escala | Depende da estimação das distribuições | Quanto maior a distância, maior a diferença entre as distribuições |
+
+# Considerações sobre Big Data
+
+A escolha de uma métrica não deve considerar apenas sua capacidade estatística de detectar drift, mas também sua capacidade de ser calculada de maneira eficiente sobre grandes volumes de dados. Em ambientes de Big Data, o dado não cabe em memória de uma única máquina e cada passagem completa pelo conjunto tem um custo relevante, o que muda a forma de comparar os métodos.
+
+O primeiro critério é a necessidade de percorrer e armazenar os dados. PSI, Jensen-Shannon, Hellinger e Qui-quadrado podem ser calculados a partir de histogramas ou contagens por categoria, isto é, de agregações compactas que reduzem bilhões de registros a algumas dezenas de números. Isso permite uma única varredura dos dados, sem guardar amostras, e o histograma de referência pode ser calculado uma vez e reutilizado a cada nova janela. O KS, em sua forma exata, exige ordenar as observações para construir as funções de distribuição acumulada, operação cara em ambiente distribuído por causa do shuffle. Na prática, é comum recorrer a aproximações, como quantis aproximados ou CDFs construídas a partir de histogramas finos.
+
+O segundo critério é o processamento distribuído e a facilidade de implementação no Spark. Métricas baseadas em contagens se encaixam bem no modelo de agregação do Spark: cada partição calcula suas contagens parciais e o resultado final é obtido pela soma delas, com pouca comunicação entre os nós. A escolha dos bins exige atenção, pois eles devem ser definidos a partir da referência e reaproveitados na janela atual, para que as duas distribuições sejam comparáveis. Já métricas que dependem de ordenação global ou de estimação de densidade exigem mais código customizado e mais custo de comunicação.
+
+O terceiro critério é a dimensionalidade. As métricas aqui discutidas são aplicadas, em geral, variável a variável, de modo que o custo cresce linearmente com o número de atributos e o cálculo pode ser paralelizado entre colunas. Abordagens multivariadas capturam mudanças na relação entre variáveis, mas o número de células de um histograma conjunto cresce exponencialmente com a dimensão, o que eleva o custo computacional e dificulta a estimação com amostras finitas.
+
+Em resumo, métricas baseadas em histogramas e contagens oferecem o melhor equilíbrio entre poder de detecção e escalabilidade, enquanto aquelas que dependem de ordenação ou de estimação conjunta exigem aproximações ou maior custo computacional. Esta seção não busca provar matematicamente qual métrica é a melhor, mas discutir o trade-off entre sensibilidade estatística, interpretabilidade e custo em larga escala.
+
+# Arquitetura Proposta
+
+# Implantação do Algoritmo
 
 # Info sobre a Dissertação
 
@@ -49,3 +75,4 @@ Carlos Henrique Rodrigues Sarro
 
 Email Orientador: 
 chsarro@gmail.com
+
