@@ -1,78 +1,254 @@
-# Arquitetura para detecção automática de Data Drift para BigData
+# Data Drift Detector for Big Data
 
-# Resumo
-Modelos de Machine Learning e processos de negócio dependem da estabilidade e da qualidade dos dados utilizados como entrada. Ao longo do tempo, entretanto, as características estatísticas e as distribuições desses dados podem sofrer alterações, fenômeno conhecido como Data Drift. Embora a ocorrência de drift não implique necessariamente degradação do desempenho de um modelo, sua identificação é importante para permitir o monitoramento e a investigação de possíveis impactos nos resultados produzidos. Neste trabalho, é apresentada uma arquitetura para diagnóstico de Data Drift voltada a ambientes de Big Data, contemplando o monitoramento de variáveis numéricas e categóricas. A proposta aborda a construção de perfis de referência e de produção, a aplicação de diferentes métricas estatísticas para identificação de alterações nas distribuições e a classificação da severidade do drift por variável e para o conjunto de dados. Como parte da solução, são desenvolvidos componentes em PySpark para realizar o perfilamento, o cálculo das métricas e a geração de relatórios de diagnóstico. Dessa forma, busca-se apresentar uma abordagem distribuída e aplicável a grandes volumes de dados, contribuindo para a identificação de mudanças nos padrões dos dados e para o monitoramento contínuo de modelos de Machine Learning.
+Algoritmo para **detecção e diagnóstico de Data Drift em ambientes de Big Data**, desenvolvido em **Python e Apache PySpark**.
 
-# Abstract
-Title: Architecture for automatic data drift detection in Big Data.
+O projeto foi desenvolvido como parte do trabalho de conclusão de curso **"Arquitetura para detecção automática de Data Drift para BigData"**, com o objetivo de identificar alterações nas distribuições das variáveis de entrada de modelos de Machine Learning e fornecer informações para apoiar o monitoramento dos dados.
 
-Machine Learning models and business processes depend on the stability and quality of the input data used. Over time, however, the statistical characteristics and distributions of these data can undergo changes, a phenomenon known as Data Drift. Although the occurrence of drift does not necessarily imply performance degradation of a model, its identification is important to enable monitoring and investigation of potential impacts on the generated results. In this work, an architecture for Data Drift diagnosis targeted at Big Data environments is presented, covering the monitoring of numerical and categorical variables. The proposal addresses the construction of reference and production profiles, the application of different statistical metrics to identify distribution changes, and the classification of drift severity per variable and for the dataset as a whole. As part of the solution, components are developed in PySpark to perform profiling, metric calculation, and the generation of diagnostic reports. Thus, the objective is to present a distributed approach applicable to large data volumes, contributing to the identification of changes in data patterns and the continuous monitoring of Machine Learning models.
+## Objetivo
 
-Keywords: Data Drift, Machine Learning, Big Data, PySpark, Data Monitoring
+O algoritmo compara dois conjuntos de dados:
 
-# Introdução
+- **Referência:** normalmente os dados utilizados no treinamento do modelo;
+- **Produção:** dados atuais utilizados pelo modelo.
 
-Dentro do mundo das empresas as tomadas de decisões sempre vem com dados. Geralmente, esses dados eles são a entrada de algum processo negocial ou um modelo de machine learning. Vamos pegar um exemplo, no ano de 2020, ano da Pandemia do COVID-19 os atendimentos da agência bancárias foram diminuidos aos montes, enquanto, o número de canais digitais aumentou. Isso é uma mudança significativa na distribuição dos dados. Se eu tiver um modelo de Machine Learning de previsão de Numerário das Agências, com certeza, eu teria que rever os dados de entrada nesse cenário. 
+A partir dessa comparação, são identificadas alterações nas distribuições das variáveis numéricas e categóricas, calculadas métricas de drift e atribuídos níveis de severidade por variável e para o conjunto de dados.
 
-O conceito dessa mudança dos dados de entrada de um modelo de Machine Learning é conhecido como Data Drift (Referência: A Survey on Concept Drift Adaptation (2014)). No estudo de Gama (Referência: A Survey on Concept Drift Adaptation (2014)), ele define que o drift pode acontecer de diferentes formas. Pode acontecer de forma abrupta, quando de uma hora para outra a distribuição dos dados muda de repente, o exemplo da pandemia pode ser interessante para mostrar essa mudança. Outra forma de Data Drift é ser incremental/gradual, ou seja, vai mudando de pouco a pouco. Esse tipo de drift é um tipo de drift mais suave e mais difícil de identificar. Um dos cuidados que deve ter é não confundir Outlier com Data Drift. Isso é um dos casos mais cuidadosos que devem ser identificados em modelos de Machine Learning. Na figura abaixo, ilustra bem os significados de cada um de drift. 
+## Arquitetura
 
-Os modelos de Machine Learning funciona da seguinte forma, recebe os dados de entrada e retorna os dados de saída. Os dados de entrada variam de diferentes formatos, podem ser textos (que são convertidos em vetores), podem ser imagens, mas na maioria dos trabalhos os modelos de machine learning recebe dados númericos e categóricos. Como falado, se acontece uma mudança significativa nos dados de entrada, pode ocorrer que o resultado do modelo de Machine Learning se degrada e dessa forma é interessante identificar qual feature do modelo fez com que tivesse essa mudança de resultado. 
+O detector foi organizado em componentes independentes:
 
-Tem que deixar claro também que tem dois tipos de drifts importantes. No que iremos tratar nesse trabalho é apenas o Data Drift, ou seja, quando a distribuição de entrada P(x) em produção difere da distribuição P(x) de treino. E além disso, quando isso impacta no resultado do modelo. No estudo de Gama e Ackerman et al. (2021), trazem a definição de Concept Drift, ou seja,  quando a relação estatística entre X e Y muda, mesmo a distribuição de entrada P(X) continua a mesma. Na forma matemática, a definição seria da seguinte forma, P(X_train) = P(X_prod), entretanto, P(Y/X_train) "sinal de diferente" P(Y/X_prod). Dentro do estudo de Ackerman et al. (2021), apresenta técnicas e métricas para verificar esses tipo de casos. 
+```text
+SparkDataDriftDetector
+│
+├── DriftConfig
+├── SchemaValidator
+├── FeatureProfiler
+│   ├── NumericProfiler
+│   └── CategoricalProfiler
+├── MetricCalculator
+│   ├── PSI
+│   ├── Jensen-Shannon
+│   ├── Hellinger
+│   ├── KS Aproximado
+│   └── Chi-Square
+├── SeverityClassifier
+├── DriftReport
+└── PersistenceAdapter
+```
 
-Dentro dos estudos apresentados, oferecem diversas formas de identificar o drift. No caso de Ackerman et al. (2022), ele cria método com a diminuição de componentes para analisar o drift e impacto no modelo. No nosso estudo, iremos focar apenas no primeiro conceito apresentado antes, mudança de P(X) que impacta o modelo de machine learning, porém, o foco será construir uma arquitetura para o ambiente BigData visto que no ano de 2026 o número de dados movidos no mundo deve chegar a (Fonte). Devido a isso, iremos construir essa infraestrutura dentro do ambiente do Pyspark. 
+Cada componente possui uma responsabilidade específica, permitindo a evolução e manutenção do algoritmo de forma modular.
 
-# Data Drift
+## Fluxo
 
-Neste tópico, apresentamos de forma resumida os principais tipos de data drift e discutimos se cada um deles impacta o desempenho de um modelo de Machine Learning. Como visto no tópico anterior, existem diferentes tipos de drift, e vamos explorar cada um deles a seguir.
+O processamento segue as seguintes etapas:
 
-O primeiro tipo, e o que será trabalhado ao longo deste artigo, é o Data Drift, também chamado de Covariate Drift. Ele ocorre quando a distribuição de uma variável de entrada se altera, ou seja, matematicamente, quando P(X_treino) difere estatisticamente de P(X_prod). Para ilustrar, tomamos como base o exemplo de Gama et al. (2014): um modelo de credit scoring treinado com dados históricos nos quais a variável "renda mensal" apresenta uma distribuição relativamente estável, centrada em uma faixa específica. Após um evento macroeconômico, como um período de inflação alta ou uma crise que reduz o poder de compra, a distribuição dessa variável se desloca: a média diminui, a variância aumenta ou a forma da distribuição muda, passando a apresentar maior assimetria.
+```text
+Dados de Referência
+        │
+        ▼
+Validação do Schema
+        │
+        ▼
+Perfil Estatístico
+        │
+        ├──────────────┐
+        ▼              ▼
+   Numéricas      Categóricas
+        │              │
+        └──────┬───────┘
+               ▼
+       Cálculo das Métricas
+               │
+               ▼
+      Classificação de Severidade
+               │
+               ▼
+         Drift Report
+```
 
-Isso caracteriza um drift univariado de covariável: a distribuição de entrada P(renda) mudou, ainda que a relação entre renda e risco de inadimplência, P(Y|X), permaneça a mesma. Como o modelo foi treinado sob a distribuição antiga, seu desempenho se degrada, pois ele passa a operar em uma região do espaço de entrada pouco representada nos dados de treino. Esse cenário, em que há mudança em P(X) sem alteração na relação com o alvo, corresponde à distinção clássica, discutida na literatura de concept drift, entre drift real (mudança em P(Y|X)) e drift virtual, ou covariate shift (mudança apenas em P(X)).
+### 1. Validação
 
-A figura abaixo ilustra o conceito. Para verificar se a distribuição de uma variável mudou entre treino e produção, uma abordagem mais robusta é comparar as funções de distribuição acumulada (CDF), como ocorre no teste de Kolmogorov-Smirnov, em vez de depender apenas do histograma, cujo aspecto varia conforme a escolha dos intervalos (bins).
+Verifica possíveis diferenças estruturais entre os conjuntos de dados, incluindo:
 
-O Label Drift (ou Target Drift) ocorre quando a distribuição da variável alvo muda ao longo do tempo, ou seja, quando P(Y_treino)  P(Y_prod), mesmo que a relação P(X|Y) permaneça estável. Um exemplo clássico está na detecção de fraude: se o modelo foi treinado em um período em que 1% das transações eram fraudulentas e, em produção, essa proporção sobe para 5% por conta de uma nova campanha de ataques, a distribuição do rótulo se alterou. O mesmo vale para um modelo de churn durante uma crise econômica, em que a taxa de cancelamento aumenta de forma generalizada. Uma particularidade importante é que, em produção, os rótulos reais costumam chegar com atraso (como a confirmação de uma fraude ou de uma inadimplência), o que torna a detecção do Label Drift mais lenta e, muitas vezes, dependente de proxies, como a distribuição das próprias predições do modelo.
+- colunas ausentes;
+- alterações de tipos;
+- valores ausentes;
+- categorias inesperadas.
 
-Em relação ao impacto, o Label Drift tende a afetar o modelo, mas de forma diferente do Covariate Drift. Como o modelo aprendeu implicitamente a probabilidade a priori das classes, uma mudança nessa proporção desloca o ponto de operação ideal: as probabilidades preditas ficam descalibradas e o limiar de decisão deixa de ser adequado, prejudicando métricas como precisão, recall e acurácia, especialmente em problemas desbalanceados. Já métricas independentes da prevalência, como a curva ROC e a AUC, podem permanecer relativamente estáveis, o que significa que o impacto nem sempre é uma perda de poder discriminativo, mas sim de calibração e de decisão. Quando a mudança é pequena e o modelo é robusto, o efeito pode ser desprezível; quando é significativa, geralmente se corrige com recalibração, ajuste de limiares ou retreinamento.
+### 2. Perfilamento
 
-No próximo tópico, abordaremos as métricas de detecção de drift e definiremos quais serão utilizadas no desenvolvimento do algoritmo.
+São construídos perfis estatísticos resumidos dos dados.
 
-# Métricas para detecção de Drift
+Para variáveis numéricas são utilizados histogramas e quantis. Para variáveis categóricas são calculadas frequências e proporções.
 
-A detecção de drift pode ser feita com dezenas de métodos estatísticos, mas implementar todos eles não contribuiria para os objetivos deste trabalho. Por isso, foi selecionado um conjunto reduzido de métricas que cobre diferentes famílias de comparação entre distribuições: o Population Stability Index (PSI), o teste de Kolmogorov-Smirnov (KS), a divergência de Jensen-Shannon (JS), o teste Qui-quadrado (χ²) para variáveis categóricas e a distância de Hellinger. Todas comparam a distribuição de uma janela de referência (dados de treino) com a de uma janela atual (dados de produção), mas diferem na interpretação do resultado, nas premissas e, principalmente, no custo de cálculo.
+### 3. Métricas
 
-O PSI quantifica o deslocamento entre duas distribuições a partir da proporção de observações em cada intervalo (bin), sendo amplamente usado em risco de crédito pela facilidade de interpretação e pelos limiares empíricos consagrados. Sua limitação é a dependência da escolha dos bins. O KS é um teste não paramétrico que mede a maior diferença entre as funções de distribuição acumulada de duas amostras, sem assumir uma forma específica para os dados, mas é essencialmente univariado. A divergência de Jensen-Shannon é uma versão simétrica e limitada da divergência de Kullback-Leibler, o que facilita a interpretação, embora exija discretização ou estimação das densidades. O Qui-quadrado compara as frequências observadas e esperadas das categorias de uma variável categórica, sendo a escolha natural para esse tipo de dado. A distância de Hellinger mede a similaridade entre distribuições de probabilidade e também depende de uma representação discretizada, com custo que tende a crescer quando se consideram várias dimensões ao mesmo tempo.
+O algoritmo utiliza cinco métricas principais:
 
-| Métrica | Tipo de dado | Natureza | Vantagem | Limitação | Interpretação |
-|---|---|---|---|---|---|
-| **PSI** | Numérico ou categórico | Distância/índice | Simples, interpretável e amplamente utilizado em monitoramento | Sensível à definição dos *bins* | Valores maiores indicam maior diferença entre as distribuições |
-| **Kolmogorov-Smirnov (KS)** | Numérico contínuo | Teste estatístico | Não paramétrico e não requer discretização | Aplicação tradicionalmente univariada; sensível ao tamanho amostral | Baseia-se na maior diferença absoluta entre as funções de distribuição acumulada |
-| **Jensen-Shannon (JS)** | Numérico ou categórico | Divergência | Simétrica, limitada e mais estável que KL em algumas situações | Requer estimativa das distribuições | Quanto maior a divergência, maior a diferença entre as distribuições |
-| **Qui-quadrado (χ²)** | Categórico | Teste estatístico | Adequado para comparar frequências observadas e esperadas | Requer condições sobre frequências esperadas e pode ser sensível a grandes amostras | *p*-valor baixo sugere evidência de diferença entre as distribuições |
-| **Distância de Hellinger** | Numérico ou categórico | Distância | Simétrica, limitada e independente de escala | Depende da estimação das distribuições | Quanto maior a distância, maior a diferença entre as distribuições |
+| Métrica | Aplicação |
+|---|---|
+| PSI | Numéricas e categóricas |
+| Kolmogorov-Smirnov (KS) | Variáveis numéricas |
+| Jensen-Shannon (JS) | Numéricas e categóricas |
+| Hellinger | Numéricas e categóricas |
+| Qui-quadrado (χ²) | Variáveis categóricas |
 
-# Considerações sobre Big Data
+As métricas são calculadas comparando a distribuição dos dados de referência com a distribuição dos dados monitorados.
 
-A escolha de uma métrica não deve considerar apenas sua capacidade estatística de detectar drift, mas também sua capacidade de ser calculada de maneira eficiente sobre grandes volumes de dados. Em ambientes de Big Data, o dado não cabe em memória de uma única máquina e cada passagem completa pelo conjunto tem um custo relevante, o que muda a forma de comparar os métodos.
+### 4. Severidade
 
-O primeiro critério é a necessidade de percorrer e armazenar os dados. PSI, Jensen-Shannon, Hellinger e Qui-quadrado podem ser calculados a partir de histogramas ou contagens por categoria, isto é, de agregações compactas que reduzem bilhões de registros a algumas dezenas de números. Isso permite uma única varredura dos dados, sem guardar amostras, e o histograma de referência pode ser calculado uma vez e reutilizado a cada nova janela. O KS, em sua forma exata, exige ordenar as observações para construir as funções de distribuição acumulada, operação cara em ambiente distribuído por causa do shuffle. Na prática, é comum recorrer a aproximações, como quantis aproximados ou CDFs construídas a partir de histogramas finos.
+Os resultados são classificados em níveis de severidade para facilitar a priorização das variáveis que apresentam maiores indícios de alteração.
 
-O segundo critério é o processamento distribuído e a facilidade de implementação no Spark. Métricas baseadas em contagens se encaixam bem no modelo de agregação do Spark: cada partição calcula suas contagens parciais e o resultado final é obtido pela soma delas, com pouca comunicação entre os nós. A escolha dos bins exige atenção, pois eles devem ser definidos a partir da referência e reaproveitados na janela atual, para que as duas distribuições sejam comparáveis. Já métricas que dependem de ordenação global ou de estimação de densidade exigem mais código customizado e mais custo de comunicação.
+### 5. Relatório
 
-O terceiro critério é a dimensionalidade. As métricas aqui discutidas são aplicadas, em geral, variável a variável, de modo que o custo cresce linearmente com o número de atributos e o cálculo pode ser paralelizado entre colunas. Abordagens multivariadas capturam mudanças na relação entre variáveis, mas o número de células de um histograma conjunto cresce exponencialmente com a dimensão, o que eleva o custo computacional e dificulta a estimação com amostras finitas.
+Ao final, o algoritmo consolida:
 
-Em resumo, métricas baseadas em histogramas e contagens oferecem o melhor equilíbrio entre poder de detecção e escalabilidade, enquanto aquelas que dependem de ordenação ou de estimação conjunta exigem aproximações ou maior custo computacional. Esta seção não busca provar matematicamente qual métrica é a melhor, mas discutir o trade-off entre sensibilidade estatística, interpretabilidade e custo em larga escala.
+- métricas por variável;
+- indicação de drift;
+- severidade;
+- informações sobre o conjunto de dados;
+- recomendações para análise.
 
-# Arquitetura Proposta
+## Instalação
 
-# Implantação do Algoritmo
+Clone o repositório:
 
-# Info sobre a Dissertação
+```bash
+git clone https://github.com/Alexandretcosta/data_drift.git
+cd data_drift
+```
 
-Nome Orientador:
-Carlos Henrique Rodrigues Sarro
+Instale as dependências necessárias para execução com Python e PySpark.
 
-Email Orientador: 
-chsarro@gmail.com
+> Recomenda-se utilizar uma instalação do Apache Spark compatível com a versão do PySpark utilizada no projeto.
 
+## Utilização
+
+Com uma sessão Spark criada:
+
+```python
+from spark_data_drift_detector import (
+    DriftConfig,
+    SparkDataDriftDetector
+)
+
+categorical_columns = [
+    "ProductCD",
+    "P_emaildomain",
+    "card6"
+]
+
+numerical_columns = [
+    "V96",
+    "V127",
+    "V133",
+    "V160"
+]
+
+config = DriftConfig(
+    categorical_columns=categorical_columns,
+    numerical_columns=numerical_columns
+)
+
+detector = SparkDataDriftDetector(
+    spark=spark,
+    config=config
+)
+
+result = detector.detect(
+    reference_df=df_train,
+    production_df=df_test
+)
+
+result.show(truncate=False)
+```
+
+Nesse exemplo:
+
+- `df_train` representa os dados de referência;
+- `df_test` representa os dados monitorados;
+- as variáveis são separadas entre numéricas e categóricas;
+- o Spark realiza o processamento distribuído.
+
+## Exemplo utilizado no trabalho
+
+Para validar o algoritmo, foi utilizada a base **IEEE-CIS Fraud Detection**, disponibilizada pela Vesta Corporation na plataforma Kaggle.
+
+O experimento utilizou:
+
+- **590.540 registros** de treinamento;
+- **506.691 registros** de teste;
+- **3 variáveis categóricas:** `ProductCD`, `P_emaildomain` e `card6`;
+- **4 variáveis numéricas:** `V96`, `V127`, `V133` e `V160`.
+
+O conjunto de treino foi utilizado como referência e o conjunto de teste como dados de monitoramento.
+
+### Resultado do experimento
+
+Nenhuma das sete variáveis analisadas apresentou drift no experimento realizado.
+
+```text
+Variáveis analisadas:       7
+Variáveis com drift:        0
+Variáveis com alta crítica: 0
+Proporção com drift:        0%
+Drift no conjunto:          Não
+Severidade geral:           Nenhuma
+```
+
+O perfilamento da base de referência levou aproximadamente **3 minutos**, enquanto a comparação com o conjunto de teste e a geração do relatório levaram aproximadamente **3 minutos** na infraestrutura utilizada.
+
+## Estrutura do projeto
+
+```text
+data_drift/
+│
+├── spark_data_drift_detector.py
+├── rotina-teste.ipynb
+├── README.md
+└── ...
+```
+
+### `spark_data_drift_detector.py`
+
+Implementação principal do detector de Data Drift.
+
+### `rotina-teste.ipynb`
+
+Notebook utilizado para carregar os dados, configurar o algoritmo e executar os testes.
+
+## Escalabilidade
+
+A solução utiliza PySpark para explorar o processamento distribuído dos dados.
+
+As métricas baseadas em histogramas e contagens permitem trabalhar com perfis estatísticos compactos, evitando a necessidade de comparar individualmente todos os registros entre as bases. Essa característica é especialmente relevante em ambientes de grandes volumes de dados.
+
+## Limitações
+
+O experimento realizado teve como objetivo principal validar a implementação e o fluxo do algoritmo. Como as variáveis analisadas não apresentaram drift entre treino e teste, o experimento não permite avaliar completamente a sensibilidade do detector diante de mudanças reais.
+
+Como próximos passos, podem ser realizados:
+
+- testes com drift sintético;
+- avaliação com outras bases de dados;
+- inclusão de novas métricas;
+- avaliação da sensibilidade das métricas;
+- testes em ambientes de Big Data de maior escala.
+
+Essas possibilidades são indicadas como trabalhos futuros no estudo.
+
+## Tecnologias
+
+- Python
+- Apache PySpark
+- Apache Spark
+- Google Colab
+- Jupyter Notebook
+
+## Autor
+
+**Alexandre Teixeira Costa**
+
+Projeto disponível no GitHub:
+
+`github.com/Alexandretcosta/data_drift`
